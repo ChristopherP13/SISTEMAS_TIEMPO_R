@@ -1,0 +1,1 @@
+Command: cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Users\Cris\.espressif\python_env\idf6.0_py3.11_env\Scripts\python.exe -DESP_PLATFORM=1 -DSDKCONFIG='c:\Users\Cris\Desktop\sitemas_TR\Primer-taller\sdkconfig' -DCCACHE_ENABLE=1 C:\Users\Cris\Desktop\sitemas_TR\Primer-taller
