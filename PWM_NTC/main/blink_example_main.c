@@ -1,134 +1,239 @@
 #include <stdio.h>
+#include <inttypes.h>
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "esp_err.h"
-#include <inttypes.h>
 #include "esp_adc/adc_oneshot.h"
-#include <math.h> // Necesario para el NTC
 
-//================================================================//
-//==              CONFIGURACIÓN DEL POTENCIÓMETRO               ==//
-//================================================================//
+//================== Pines y canales ==================//
 #define POT_PWM_OUTPUT_PIN    26
-#define POT_ADC_UNIT          ADC_UNIT_1
-#define POT_ADC_CHANNEL       ADC_CHANNEL_6     // Conectado a GPIO34
-#define POT_PWM_CHANNEL       LEDC_CHANNEL_0    // Usará el canal PWM 0
+#define POT_ADC_CHANNEL       ADC_CHANNEL_6      // GPIO34 (ADC1_CH6)
+#define POT_PWM_CHANNEL       LEDC_CHANNEL_0
 
-//================================================================//
-//==               CONFIGURACIÓN DEL TERMISTOR NTC              ==//
-//================================================================//
-#define NTC_PWM_OUTPUT_PIN    27                // Pin de salida para el LED de temperatura
-#define NTC_ADC_UNIT          ADC_UNIT_1        // Comparte la unidad ADC con el potenciómetro
-#define NTC_ADC_CHANNEL       ADC_CHANNEL_4     // Conectado a GPIO32
-#define NTC_PWM_CHANNEL       LEDC_CHANNEL_1    // Usará el canal PWM 1
-#define R_FIJA                100000.0          // Resistencia fija de 100k Ohms
-#define NTC_R_NOMINAL         100000.0          // Resistencia nominal del NTC a 25°C
-#define NTC_TEMP_NOMINAL      298.15            // Temperatura nominal en Kelvin (25 + 273.15)
-#define NTC_BETA              4190.0            // Coeficiente Beta del NTC
-#define VOLTAJE_ENTRADA       3.3               // Voltaje de alimentación del divisor
+#define NTC_PWM_OUTPUT_PIN    27
+#define NTC_ADC_CHANNEL       ADC_CHANNEL_4      // GPIO32 (ADC1_CH4)
+#define NTC_PWM_CHANNEL       LEDC_CHANNEL_1
 
-//================================================================//
-//==             CONFIGURACIÓN GENERAL DE PWM Y MONITOREO       ==//
-//================================================================//
-#define PWM_TIMER             LEDC_TIMER_0      // Ambos PWM compartirán el mismo timer
+//================== NTC parámetros ===================//
+#define R_FIJA                100000.0f
+#define NTC_R_NOMINAL         100000.0f
+#define NTC_TEMP_NOMINAL      298.15f           // 25°C en K
+#define NTC_BETA              4190.0f
+#define VOLTAJE_ENTRADA       3.3f
+
+//================== LEDC (PWM) ======================//
+#define PWM_TIMER             LEDC_TIMER_0
 #define PWM_MODE              LEDC_HIGH_SPEED_MODE
 #define PWM_DUTY_RES          LEDC_TIMER_8_BIT
-#define PWM_FREQUENCY         (5000)
-#define MONITOR_INTERVAL_MS   1000              // Intervalo de 3 segundos
-static const char *TAG = "CONTROL_DUAL";
+#define PWM_FREQUENCY         (5000)            // 5 kHz
 
+//================== Periodos tareas =================//
+#define SENSE_PERIOD_MS       1000     // 50 Hz muestreo
+#define LOG_TIMEOUT_MS        1000   // Logger imprime al menos cada 1 s si no llegan datos
 
-void app_main(void)
+static const char *TAG = "CONTROL_DUAL_Q+SEM";
+
+//================== Mensaje que viaja por colas =====//
+typedef struct {
+    int     pot_raw;
+    int     ntc_raw;
+    float   v_ntc;
+    float   temp_c;
+    uint32_t pot_pwm;  // 0..255
+    uint32_t ntc_pwm;  // 0..255
+} sample_msg_t;
+
+//===== Colas (una por consumidor) y semáforos binarios =====//
+static QueueHandle_t qAct = NULL;  // Sensor -> Actuador
+static QueueHandle_t qLog = NULL;  // Sensor -> Logger
+static SemaphoreHandle_t semAct = NULL; // “hay nuevo dato” para Actuador
+static SemaphoreHandle_t semLog = NULL; // “hay nuevo dato” para Logger
+
+// ADC handle (sólo lo usa TaskSensor)
+static adc_oneshot_unit_handle_t g_adc1 = NULL;
+
+//================== Utilidades =======================//
+static inline uint32_t clip_u32(uint32_t x, uint32_t lo, uint32_t hi) {
+    if (x < lo) return lo;
+    if (x > hi) return hi;
+    return x;
+}
+
+//================== Inicialización periféricos =======//
+static void init_pwm(void)
 {
-    //------------------- CONFIGURACIÓN DEL HARDWARE -------------------//
-    // 1. Configurar el TIMER del PWM (común para ambos LEDs)
-    ledc_timer_config_t ledc_timer = {
-        .speed_mode       = PWM_MODE,
-        .timer_num        = PWM_TIMER,
-        .duty_resolution  = PWM_DUTY_RES,
-        .freq_hz          = PWM_FREQUENCY,
-        .clk_cfg          = LEDC_AUTO_CLK
+    ledc_timer_config_t tcfg = {
+        .speed_mode      = PWM_MODE,
+        .timer_num       = PWM_TIMER,
+        .duty_resolution = PWM_DUTY_RES,
+        .freq_hz         = PWM_FREQUENCY,
+        .clk_cfg         = LEDC_AUTO_CLK
     };
-    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+    ESP_ERROR_CHECK(ledc_timer_config(&tcfg));
 
-    // 2. Configurar el CANAL PWM para el Potenciómetro
-    ledc_channel_config_t pot_ledc_channel = {
-        .speed_mode     = PWM_MODE,
-        .channel        = POT_PWM_CHANNEL,
-        .timer_sel      = PWM_TIMER,
-        .gpio_num       = POT_PWM_OUTPUT_PIN,
-        .duty           = 0,
+    ledc_channel_config_t cpot = {
+        .speed_mode = PWM_MODE,
+        .channel    = POT_PWM_CHANNEL,
+        .timer_sel  = PWM_TIMER,
+        .gpio_num   = POT_PWM_OUTPUT_PIN,
+        .duty       = 0,
+        .hpoint     = 0
     };
-    ESP_ERROR_CHECK(ledc_channel_config(&pot_ledc_channel));
-    
-    // 3. Configurar el CANAL PWM para el NTC
-    ledc_channel_config_t ntc_ledc_channel = {
-        .speed_mode     = PWM_MODE,
-        .channel        = NTC_PWM_CHANNEL,
-        .timer_sel      = PWM_TIMER,
-        .gpio_num       = NTC_PWM_OUTPUT_PIN,
-        .duty           = 0,
+    ESP_ERROR_CHECK(ledc_channel_config(&cpot));
+
+    ledc_channel_config_t cntc = {
+        .speed_mode = PWM_MODE,
+        .channel    = NTC_PWM_CHANNEL,
+        .timer_sel  = PWM_TIMER,
+        .gpio_num   = NTC_PWM_OUTPUT_PIN,
+        .duty       = 0,
+        .hpoint     = 0
     };
-    ESP_ERROR_CHECK(ledc_channel_config(&ntc_ledc_channel));
+    ESP_ERROR_CHECK(ledc_channel_config(&cntc));
+}
 
-    // 4. Inicializar la UNIDAD ADC (común para ambos sensores)
-    adc_oneshot_unit_handle_t adc1_handle;
-    adc_oneshot_unit_init_cfg_t init_config1 = { .unit_id = ADC_UNIT_1 };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
+static void init_adc(void)
+{
+    adc_oneshot_unit_init_cfg_t ucfg = { .unit_id = ADC_UNIT_1 };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&ucfg, &g_adc1));
 
-    // 5. Configurar el CANAL ADC para el Potenciómetro
-    adc_oneshot_chan_cfg_t adc_config = { .bitwidth = ADC_BITWIDTH_DEFAULT, .atten = ADC_ATTEN_DB_12, };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, POT_ADC_CHANNEL, &adc_config));
-    
-    // 6. Configurar el CANAL ADC para el NTC
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, NTC_ADC_CHANNEL, &adc_config));
+    adc_oneshot_chan_cfg_t chcfg = {
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .atten    = ADC_ATTEN_DB_12
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(g_adc1, POT_ADC_CHANNEL, &chcfg));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(g_adc1, NTC_ADC_CHANNEL, &chcfg));
+}
 
-    ESP_LOGI(TAG, "Configuración completada. Iniciando bucle principal.");
+//================== Task: Sensor (productor) =========//
+static void TaskSensor(void *arg)
+{
+    (void)arg;
+    TickType_t last = xTaskGetTickCount();
 
-    //------------------- BUCLE PRINCIPAL -------------------//
     while (1) {
-        
-        // --- TAREA 1: Lógica del Potenciómetro ---
-        int pot_raw_value;
-        uint32_t pot_duty_cycle;
+        sample_msg_t m = {0};
 
-        adc_oneshot_read(adc1_handle, POT_ADC_CHANNEL, &pot_raw_value);
-        pot_duty_cycle = (pot_raw_value * 255) / 4095;
-        ledc_set_duty(PWM_MODE, POT_PWM_CHANNEL, pot_duty_cycle);
+        // Leer ADC
+        (void)adc_oneshot_read(g_adc1, POT_ADC_CHANNEL, &m.pot_raw);
+        (void)adc_oneshot_read(g_adc1, NTC_ADC_CHANNEL, &m.ntc_raw);
+
+        // Derivados
+        m.pot_pwm = (uint32_t)((m.pot_raw * 255UL) / 4095UL);
+
+        m.v_ntc = m.ntc_raw * (VOLTAJE_ENTRADA / 4095.0f);
+        float denom = VOLTAJE_ENTRADA - m.v_ntc;
+        float r_ntc = (denom > 1e-6f) ? (R_FIJA * m.v_ntc / denom) : 1e9f;
+
+        float invT   = (1.0f / NTC_TEMP_NOMINAL) + (1.0f / NTC_BETA) * logf(r_ntc / NTC_R_NOMINAL);
+        float temp_k = 1.0f / invT;
+        m.temp_c = temp_k - 273.15f;
+
+        if (m.temp_c <= 0.0f)       m.ntc_pwm = 0;
+        else if (m.temp_c >= 50.0f) m.ntc_pwm = 255;
+        else                        m.ntc_pwm = (uint32_t)(m.temp_c * 255.0f / 50.0f);
+
+        // Enviar a colas (no bloquear: si están llenas, pisa el más viejo)
+        // Profundidad >1 permite "buffer" cuando consumidores están ocupados.
+        (void)xQueueSend(qAct, &m, 0);
+        (void)xQueueSend(qLog, &m, 0);
+
+        // Despertar consumidores inmediatamente
+        xSemaphoreGive(semAct);
+        xSemaphoreGive(semLog);
+
+        vTaskDelayUntil(&last, pdMS_TO_TICKS(SENSE_PERIOD_MS));
+    }
+}
+
+//================== Task: Actuador (consumidor) ======//
+static void TaskActuador(void *arg)
+{
+    (void)arg;
+
+    while (1) {
+        // Espera notificación de nueva muestra
+        xSemaphoreTake(semAct, portMAX_DELAY);
+
+        // Drena la cola para quedarnos con la última muestra disponible
+        sample_msg_t m, latest = {0};
+        BaseType_t got_any = pdFALSE;
+        while (xQueueReceive(qAct, &m, 0) == pdTRUE) {
+            latest = m;
+            got_any = pdTRUE;
+        }
+        if (!got_any) continue; // nada que hacer
+
+        uint32_t pot = clip_u32(latest.pot_pwm, 0, 255);
+        uint32_t ntc = clip_u32(latest.ntc_pwm, 0, 255);
+
+        ledc_set_duty(PWM_MODE, POT_PWM_CHANNEL, pot);
         ledc_update_duty(PWM_MODE, POT_PWM_CHANNEL);
 
-
-        // --- TAREA 2: Lógica del Termistor NTC ---
-        int ntc_raw_value;
-        float ntc_voltaje, ntc_resistencia, temp_kelvin, temp_celsius;
-        uint32_t ntc_duty_cycle;
-
-        adc_oneshot_read(adc1_handle, NTC_ADC_CHANNEL, &ntc_raw_value);
-        ntc_voltaje = ntc_raw_value * (VOLTAJE_ENTRADA / 4095.0);
-        ntc_resistencia = R_FIJA * ntc_voltaje / (VOLTAJE_ENTRADA - ntc_voltaje);
-        temp_kelvin = 1.0 / ( (1.0 / NTC_TEMP_NOMINAL) + (1.0 / NTC_BETA) * log(ntc_resistencia / NTC_R_NOMINAL) );
-        temp_celsius = temp_kelvin - 273.15;
-        
-        if (temp_celsius <= 0) { ntc_duty_cycle = 0; } 
-        else if (temp_celsius >= 50) { ntc_duty_cycle = 255; } 
-        else { ntc_duty_cycle = (uint32_t)(temp_celsius * 255.0 / 50.0); }
-        
-        ledc_set_duty(PWM_MODE, NTC_PWM_CHANNEL, ntc_duty_cycle);
+        ledc_set_duty(PWM_MODE, NTC_PWM_CHANNEL, ntc);
         ledc_update_duty(PWM_MODE, NTC_PWM_CHANNEL);
+    }
+}
 
-        
-        // --- TAREA 3: Reporte en el Monitor Serie ---
-        if (temp_celsius < 0) {
-            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: < 0 C -> PWM Temp: %" PRIu32 "/255" "Voltaje Medido: %.3f V", pot_duty_cycle, ntc_duty_cycle,ntc_voltaje);
-        } else if (temp_celsius > 50) {
-            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: > 50 C -> PWM Temp: %" PRIu32 "/255""Voltaje Medido: %.3f V", pot_duty_cycle, ntc_duty_cycle,ntc_voltaje);
-        } else {
-            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: %.2f C -> PWM Temp: %" PRIu32 "/255""Voltaje Medido: %.3f V", pot_duty_cycle, temp_celsius, ntc_duty_cycle,ntc_voltaje);
+//================== Task: Logger (consumidor) ========//
+static void TaskLogger(void *arg)
+{
+    (void)arg;
+
+    while (1) {
+        // Despierta en evento o cada LOG_TIMEOUT_MS para imprimir algo
+        if (xSemaphoreTake(semLog, pdMS_TO_TICKS(LOG_TIMEOUT_MS)) != pdTRUE) {
+            // timeout: seguiremos con lo último que haya en la cola (si hay)
         }
 
-        // Intervalo de espera para el próximo ciclo
-        vTaskDelay(pdMS_TO_TICKS(MONITOR_INTERVAL_MS));
+        sample_msg_t m, latest = {0};
+        BaseType_t got_any = pdFALSE;
+        while (xQueueReceive(qLog, &m, 0) == pdTRUE) {
+            latest = m;
+            got_any = pdTRUE;
+        }
+        if (!got_any) continue;
+
+        if (latest.temp_c < 0.0f) {
+            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: < 0 C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
+                     latest.pot_pwm, latest.ntc_pwm, latest.v_ntc);
+        } else if (latest.temp_c > 50.0f) {
+            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: > 50 C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
+                     latest.pot_pwm, latest.ntc_pwm, latest.v_ntc);
+        } else {
+            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: %.2f C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
+                     latest.pot_pwm, latest.temp_c, latest.ntc_pwm, latest.v_ntc);
+        }
     }
+}
+
+//================== app_main: crea recursos y tareas ==//
+void app_main(void)
+{
+    ESP_LOGI(TAG, "Init peripherals…");
+    init_pwm();
+    init_adc();
+
+    // Colas con profundidad >1 (pequeño buffer)
+    qAct = xQueueCreate(4, sizeof(sample_msg_t));
+    qLog = xQueueCreate(4, sizeof(sample_msg_t));
+    configASSERT(qAct && qLog);
+
+    // Semáforos binarios (nacen "vacíos")
+    semAct = xSemaphoreCreateBinary();
+    semLog = xSemaphoreCreateBinary();
+    configASSERT(semAct && semLog);
+
+    // Crear tareas (prioridades relativas: Sensor > Actuador > Logger)
+    configASSERT(xTaskCreate(TaskSensor,   "SENSE",  2048, NULL, 3, NULL) == pdPASS);
+    configASSERT(xTaskCreate(TaskActuador, "ACT",    2048, NULL, 2, NULL) == pdPASS);
+    configASSERT(xTaskCreate(TaskLogger,   "LOGGER", 2048, NULL, 1, NULL) == pdPASS);
+
+    // app_main puede terminar aquí
+    // vTaskDelete(NULL);
 }

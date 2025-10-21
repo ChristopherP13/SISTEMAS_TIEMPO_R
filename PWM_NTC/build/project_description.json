@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "PWM_NTC",
-    "project_version":    "bb2dddb-dirty",
+    "project_version":    "ec28ed2-dirty",
     "project_path":       "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/PWM_NTC",
     "idf_path":           "C:/Users/Cris/esp-idf",
     "build_dir":          "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/PWM_NTC/build",
