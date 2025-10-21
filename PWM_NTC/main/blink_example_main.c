@@ -34,9 +34,9 @@
 
 //================== Periodos tareas =================//
 #define SENSE_PERIOD_MS       1000     // 50 Hz muestreo
-#define LOG_TIMEOUT_MS        1000   // Logger imprime al menos cada 1 s si no llegan datos
+#define LOG_TIMEOUT_MS        1500   // Logger imprime al menos cada 1 s si no llegan datos
 
-static const char *TAG = "CONTROL_DUAL_Q+SEM";
+static const char *TAG = "PWM del potenciometro";
 
 //================== Mensaje que viaja por colas =====//
 typedef struct {
@@ -200,13 +200,13 @@ static void TaskLogger(void *arg)
         if (!got_any) continue;
 
         if (latest.temp_c < 0.0f) {
-            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: < 0 C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
+            ESP_LOGI(TAG, " %" PRIu32 "/255 | Temp: < 0 C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
                      latest.pot_pwm, latest.ntc_pwm, latest.v_ntc);
         } else if (latest.temp_c > 50.0f) {
-            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: > 50 C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
+            ESP_LOGI(TAG, " %" PRIu32 "/255 | Temp: > 50 C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
                      latest.pot_pwm, latest.ntc_pwm, latest.v_ntc);
         } else {
-            ESP_LOGI(TAG, "Pot: %" PRIu32 "/255 | Temp: %.2f C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
+            ESP_LOGI(TAG, " %" PRIu32 "/255 | Temp: %.2f C -> PWM Temp: %" PRIu32 "/255 | V_NTC=%.3f V",
                      latest.pot_pwm, latest.temp_c, latest.ntc_pwm, latest.v_ntc);
         }
     }
