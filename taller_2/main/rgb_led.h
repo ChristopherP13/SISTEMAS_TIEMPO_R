@@ -3,22 +3,45 @@
 
 #include "driver/ledc.h"
 
+// =======================================================
+// --- NUEVAS ESTRUCTURAS ---
+// =======================================================
+
+/**
+ * @brief Estructura para definir los pines GPIO de un LED RGB.
+ */
+typedef struct {
+    int red_pin;
+    int green_pin;
+    int blue_pin;
+} rgb_led_pins_t;
+
+/**
+ * @brief Estructura para representar un color RGB.
+ */
+typedef struct {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} rgb_color_t;
+
+
+// =======================================================
+// --- PROTOTIPOS DE FUNCIONES MODIFICADOS ---
+// =======================================================
+
 /**
  * @brief Configura e inicializa los pines y el controlador PWM (LEDC) para el LED RGB.
  *
- * @param red_gpio GPIO para el canal Rojo.
- * @param green_gpio GPIO para el canal Verde.
- * @param blue_gpio GPIO para el canal Azul.
+ * @param pins Puntero a una estructura que contiene los GPIOs para cada canal.
  */
-void rgb_led_init(int red_gpio, int green_gpio, int blue_gpio);
+void rgb_led_init(const rgb_led_pins_t *pins);
 
 /**
  * @brief Establece el color del LED RGB.
  *
- * @param red Valor de 0 a 255 para la intensidad del rojo.
- * @param green Valor de 0 a 255 para la intensidad del verde.
- * @param blue Valor de 0 a 255 para la intensidad del azul.
+ * @param color Una estructura que contiene los valores de 0 a 255 para cada color.
  */
-void rgb_led_set_color(uint8_t red, uint8_t green, uint8_t blue);
+void rgb_led_set_color(rgb_color_t color);
 
 #endif // RGB_LED_H
