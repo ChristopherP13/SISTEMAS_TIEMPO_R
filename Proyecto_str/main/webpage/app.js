@@ -8,10 +8,81 @@ var wifiConnectInterval = null;
 var scheduleFormDirty = false;
 var fanFormDirty = false;
 var fanDirtyUntil = 0;
+var tempHistory = [];
+const TEMP_HISTORY_MAX = 60;
 
 function markFanDirty(extraMs = 30000) {
     fanFormDirty = true;
     fanDirtyUntil = Date.now() + extraMs;
+}
+
+function pushTempSample(val){
+    if (isNaN(val)) return;
+    tempHistory.push({ t: Date.now(), v: val });
+    if (tempHistory.length > TEMP_HISTORY_MAX) tempHistory.shift();
+    drawTempChart();
+}
+
+function drawTempChart(){
+    var canvas = document.getElementById('temp_chart');
+    if(!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width;
+    var h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    // background
+    var grd = ctx.createLinearGradient(0,0,0,h);
+    grd.addColorStop(0,'rgba(14,165,233,0.06)');
+    grd.addColorStop(1,'rgba(14,165,233,0.0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0,0,w,h);
+
+    if(tempHistory.length < 2){
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '13px Segoe UI, sans-serif';
+        ctx.fillText('Esperando datos...', 12, h/2);
+        return;
+    }
+
+    var vals = tempHistory.map(function(p){ return p.v; });
+    var min = Math.min.apply(null, vals);
+    var max = Math.max.apply(null, vals);
+    if (max - min < 0.5) { max = min + 0.5; }
+    var pad = 12;
+    function scaleX(i){
+        if (tempHistory.length === 1) return pad;
+        return pad + (w - pad*2) * (i / (tempHistory.length - 1));
+    }
+    function scaleY(v){
+        return (h - pad) - ((v - min) / (max - min)) * (h - pad*2);
+    }
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+    ctx.beginPath();
+    ctx.moveTo(pad, scaleY(min));
+    ctx.lineTo(w - pad, scaleY(min));
+    ctx.stroke();
+
+    ctx.strokeStyle = '#0ea5e9';
+    ctx.beginPath();
+    tempHistory.forEach(function(p, idx){
+        var x = scaleX(idx);
+        var y = scaleY(p.v);
+        if(idx === 0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = '#22c55e';
+    tempHistory.forEach(function(p, idx){
+        var x = scaleX(idx);
+        var y = scaleY(p.v);
+        ctx.beginPath();
+        ctx.arc(x,y,2.5,0,Math.PI*2);
+        ctx.fill();
+    });
 }
 
 // Detecta conflicto de horarios solapados con días coincidentes
@@ -268,6 +339,7 @@ function fetchFanState(){
         $("#pwm_value").text(data.pwm.toFixed(1) + "%");
         var modeName = ['Manual','Automatico','Programado'][data.mode] || '--';
         $("#mode_value").text(modeName);
+        pushTempSample(data.temp);
 
         var allowFanOverwrite = true;
         if (fanFormDirty) {
