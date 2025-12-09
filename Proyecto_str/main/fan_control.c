@@ -1,4 +1,4 @@
-#include "fan_control.h"
+Ôªø#include "fan_control.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -47,8 +47,8 @@ typedef struct {
     float auto_t_max;
     fan_schedule_entry_t schedules[3];
     fan_run_log_t logs[FAN_LOG_ENTRIES];
-    uint8_t log_start;  // Ìndice del m·s antiguo
-    uint8_t log_count;  // cantidad v·lida
+    uint8_t log_start;  // √≠ndice del m√°s antiguo
+    uint8_t log_count;  // cantidad v√°lida
 } fan_config_blob_t;
 
 static fan_state_t s_state = {
@@ -167,7 +167,7 @@ static void fan_apply_pwm(float pwm_pct)
 
 static float read_temperature_c(void)
 {
-    if (!s_adc_unit) return 25.0f;
+    if (!s_adc_unit) return NAN;
     int acc = 0;
     for (int i = 0; i < ADC_SAMPLES; i++) {
         int val = 0;
@@ -179,9 +179,11 @@ static float read_temperature_c(void)
     float v = (raw / 4095.0f) * 3.3f; // Vref 3.3V aproximada
     float vref = 3.3f;
     if (v <= 0.01f || v >= vref - 0.01f) {
-        return 25.0f; // fuera de rango, valor seguro
+        return NAN; // fuera de rango
     }
-    float r_ntc = FAN_NTC_R_REF * (v / (vref - v));
+    // Conexi√≥n: NTC a 3.3V, Rref a GND => Vout = Vref * Rref / (Rref + Rntc)
+    // Entonces Rntc = Rref * (Vref - Vout) / Vout
+    float r_ntc = FAN_NTC_R_REF * ((vref - v) / v);
     float inv_t = (1.0f / FAN_NTC_T0_K) + (1.0f / FAN_NTC_BETA) * logf(r_ntc / FAN_NTC_R0);
     float t_k = 1.0f / inv_t;
     return t_k - 273.15f;
@@ -349,7 +351,7 @@ esp_err_t fan_control_init(void)
 
     if (fan_load_config() != ESP_OK) {
         ESP_LOGW(TAG, "No fan config found, using defaults");
-        // Inicializar days_mask por defecto (todos los dÌas activos)
+        // Inicializar days_mask por defecto (todos los d√≠as activos)
         for (int i = 0; i < 3; i++) {
             s_state.schedules[i].days_mask = 0x7F;
         }
@@ -415,3 +417,4 @@ const fan_run_log_t *fan_control_get_logs(size_t *count, uint8_t *start_index)
     if (start_index) *start_index = s_log_start;
     return s_logs;
 }
+

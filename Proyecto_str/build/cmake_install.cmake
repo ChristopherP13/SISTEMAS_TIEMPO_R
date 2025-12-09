@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str
+# Install script for directory: C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,13 +39,13 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/esp-idf/cmake_install.cmake")
+  include("C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/esp-idf/cmake_install.cmake")
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/install_local_manifest.txt"
+  file(WRITE "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
 if(CMAKE_INSTALL_COMPONENT)
@@ -61,6 +61,6 @@ else()
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

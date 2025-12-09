@@ -14,6 +14,32 @@ function markFanDirty(extraMs = 30000) {
     fanDirtyUntil = Date.now() + extraMs;
 }
 
+// Detecta conflicto de horarios solapados con días coincidentes
+function schedulesConflict(idx, payload) {
+    function contains(time, start, end) {
+        return (start <= end) ? (time >= start && time <= end)
+                              : (time >= start || time <= end); // rango cruzando medianoche
+    }
+    function overlap(start1, end1, start2, end2) {
+        return contains(start1, start2, end2) || contains(start2, start1, end1);
+    }
+
+    var pStart = payload.start_hour * 60 + payload.start_minute;
+    var pEnd   = payload.end_hour   * 60 + payload.end_minute;
+
+    if (!fanStateCache || !fanStateCache.schedules) return false;
+    for (var i = 0; i < fanStateCache.schedules.length; i++) {
+        if (i === idx) continue;
+        var s = fanStateCache.schedules[i];
+        if (!s.active) continue;
+        var sStart = s.start_hour * 60 + s.start_minute;
+        var sEnd   = s.end_hour   * 60 + s.end_minute;
+        var daysOverlap = (s.days_mask & payload.days_mask) !== 0;
+        if (daysOverlap && overlap(pStart, pEnd, sStart, sEnd)) return true;
+    }
+    return false;
+}
+
 function updateModeUI(mode) {
     var isManual = mode === 0;
     var isAuto = mode === 1;
@@ -32,7 +58,7 @@ function updateModeUI(mode) {
 $(document).ready(function(){
     startFanPolling();
     startLogsPolling();
-    startDHTSensorInterval();
+    
     $("#connect_wifi").on("click", function(){
         checkCredentials();
     });
@@ -140,17 +166,9 @@ function otaRebootTimer()
 }
 
 /** Sensors **/
-function getDHTSensorValues()
-{
-    $.getJSON('/dhtSensor.json', function(data) {
-        $("#temperature_reading").text(data["temp"]);
-    });
-}
+function getDHTSensorValues(){} // deshabilitado; usar temp de fan/state
 
-function startDHTSensorInterval()
-{
-    setInterval(getDHTSensorValues, 8000);
-}
+function startDHTSensorInterval(){} // deshabilitado
 
 /** WiFi **/
 function stopWifiConnectStatusInterval()
@@ -311,6 +329,13 @@ function toggleProgramRegister(idx, active){
         temp_0: s.temp_0,
         temp_100: s.temp_100
     };
+
+    if (active && schedulesConflict(idx, payload)) {
+        alert("Interferencia: este horario coincide con otro registro activo. Ajusta o desactiva uno.");
+        $("#reg_prog_" + idx).prop('checked', false);
+        return;
+    }
+
     $.ajax({url:'/fan/schedule', method:'POST', data:JSON.stringify(payload), contentType:'application/json', success:function(){
         fanStateCache.schedules[idx].active = active;
     }});
@@ -376,6 +401,13 @@ function send_schedule(){
         temp_0: parseFloat($("#temp0").val()),
         temp_100: parseFloat($("#temp100").val())
     };
+
+    if (schedulesConflict(idx, payload)) {
+        alert("Interferencia: este horario coincide con otro registro activo. Ajusta o desactiva uno.");
+        return;
+    }
+
+
     $.ajax({url:'/fan/schedule', method:'POST', data:JSON.stringify(payload), contentType:'application/json', success:function(){
         scheduleFormDirty = false;
         fetchFanState();
@@ -414,3 +446,4 @@ function toogle_led()
 {   
     $.ajax({ url: '/toogle_led.json', dataType: 'json', method: 'POST', cache: false });
 }
+

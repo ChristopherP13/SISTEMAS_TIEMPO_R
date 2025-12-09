@@ -18,8 +18,8 @@ end
 
 # Load bootloader symbols
 set confirm off
-    add-symbol-file C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader/bootloader.elf
+    add-symbol-file C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader/bootloader.elf
 set confirm on
 
 # Load application symbols
-file C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/Proyecto_str.elf
+file C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/Proyecto_str.elf

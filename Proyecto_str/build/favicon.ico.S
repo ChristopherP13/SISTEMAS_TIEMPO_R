@@ -1,4 +1,4 @@
-/* * Data converted from C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/main/webpage/favicon.ico
+/* * Data converted from C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/main/webpage/favicon.ico
  */
 .data
 #if !defined (__APPLE__) && !defined (__linux__)

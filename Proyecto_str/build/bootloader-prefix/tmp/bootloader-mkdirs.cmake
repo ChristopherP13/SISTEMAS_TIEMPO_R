@@ -10,18 +10,18 @@ if(NOT EXISTS "C:/Users/Cris/esp-idf/components/bootloader/subproject")
   file(MAKE_DIRECTORY "C:/Users/Cris/esp-idf/components/bootloader/subproject")
 endif()
 file(MAKE_DIRECTORY
-  "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader"
-  "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix"
-  "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix/tmp"
-  "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp"
-  "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix/src"
-  "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader"
+  "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix"
+  "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix/tmp"
+  "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp"
+  "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix/src"
+  "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

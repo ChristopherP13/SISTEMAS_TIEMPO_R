@@ -21,6 +21,7 @@
 #include "tasks_common.h"
 #include "wifi_app.h"
 #include "esp_sntp.h"
+#include "esp_netif.h"
 
 // Tag used for ESP serial console messages
 static const char TAG [] = "wifi_app";
@@ -562,6 +563,10 @@ static void wifi_app_event_handler(void *arg, esp_event_base_t event_base, int32
 				ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
 
 				wifi_app_send_message(WIFI_APP_MSG_STA_CONNECTED_GOT_IP);
+				if (esp_netif_ap) {
+					esp_err_t err = esp_netif_napt_enable(esp_netif_ap);
+					ESP_LOGI(TAG, "NAPT enable on AP: %s", esp_err_to_name(err));
+				}
 
 				break;
 		}

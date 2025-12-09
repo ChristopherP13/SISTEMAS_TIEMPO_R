@@ -1,4 +1,4 @@
-/* * Data converted from C:/Users/Cris/Desktop/sitemas_TR/Proyecto_str/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from C:/Users/Cris/Desktop/SISTEMAS_EN_TIEMPO_REAL/Proyecto_str/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 #if !defined (__APPLE__) && !defined (__linux__)

@@ -5240,7 +5240,7 @@
                     }
                 ],
                 "depends_on": null,
-                "id": "example-configuration-softap-configuration-C:-Users-Cris-Desktop-sitemas_TR-Proyecto_str-main-Kconfig.projbuild-3",
+                "id": "example-configuration-softap-configuration-C:-Users-Cris-Desktop-SISTEMAS_EN_TIEMPO_REAL-Proyecto_str-main-Kconfig.projbuild-3",
                 "title": "SoftAP Configuration",
                 "type": "menu"
             },
@@ -5361,20 +5361,20 @@
                         ],
                         "depends_on": null,
                         "help": "The weakest authmode to accept in the scan mode.\nThis value defaults to ESP_WIFI_AUTH_WPA2_PSK in case password is present\nand ESP_WIFI_AUTH_OPEN is used. Please select ESP_WIFI_AUTH_WEP / ESP_WIFI_AUTH_WPA_PSK\nin case AP is operating in WEP / WPA mode.",
-                        "id": "example-configuration-sta-configuration-wifi-scan-auth-mode-threshold-C:-Users-Cris-Desktop-sitemas_TR-Proyecto_str-main-Kconfig.projbuild-54",
+                        "id": "example-configuration-sta-configuration-wifi-scan-auth-mode-threshold-C:-Users-Cris-Desktop-SISTEMAS_EN_TIEMPO_REAL-Proyecto_str-main-Kconfig.projbuild-54",
                         "name": "ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD",
                         "title": "WiFi Scan auth mode threshold",
                         "type": "choice"
                     }
                 ],
                 "depends_on": null,
-                "id": "example-configuration-sta-configuration-C:-Users-Cris-Desktop-sitemas_TR-Proyecto_str-main-Kconfig.projbuild-32",
+                "id": "example-configuration-sta-configuration-C:-Users-Cris-Desktop-SISTEMAS_EN_TIEMPO_REAL-Proyecto_str-main-Kconfig.projbuild-32",
                 "title": "STA Configuration",
                 "type": "menu"
             }
         ],
         "depends_on": null,
-        "id": "example-configuration-C:-Users-Cris-Desktop-sitemas_TR-Proyecto_str-main-Kconfig.projbuild-1",
+        "id": "example-configuration-C:-Users-Cris-Desktop-SISTEMAS_EN_TIEMPO_REAL-Proyecto_str-main-Kconfig.projbuild-1",
         "title": "Example Configuration",
         "type": "menu"
     },
