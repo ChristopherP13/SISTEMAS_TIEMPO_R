@@ -47,6 +47,7 @@
 #define FAN_CONTROL_TASK_CORE    1
 
 #define ADC_SAMPLES 16
+#define NTC_DEBUG_LOG 0
 
 static const char *TAG = "fan_ctrl";
 
@@ -80,6 +81,8 @@ static float s_session_temp_min = 1000.0f;
 static float s_session_temp_max = -1000.0f;
 static float s_session_pwm_max = 0.0f;
 static bool s_oled_ready = false;
+static float s_last_temp_c = NAN;
+static bool s_warned_nan_temp = false;
 
 static adc_oneshot_unit_handle_t s_adc_unit = NULL;
 static uint8_t s_oled_buf[OLED_BUF_SIZE];
@@ -185,6 +188,7 @@ static esp_err_t fan_load_config(void)
 
 static float clamp_pct(float v)
 {
+    if (isnan(v)) return 0.0f;
     if (v < 0.0f) return 0.0f;
     if (v > 100.0f) return 100.0f;
     return v;
@@ -219,9 +223,16 @@ static float read_temperature_c(void)
     // Conexión: NTC a 3.3V, Rref a GND => Vout = Vref * Rref / (Rref + Rntc)
     // Entonces Rntc = Rref * (Vref - Vout) / Vout
     float r_ntc = FAN_NTC_R_REF * ((vref - v) / v);
+    if (r_ntc <= 0.0f) return NAN;
     float inv_t = (1.0f / FAN_NTC_T0_K) + (1.0f / FAN_NTC_BETA) * logf(r_ntc / FAN_NTC_R0);
     float t_k = 1.0f / inv_t;
-    return t_k - 273.15f;
+    float temp_c = t_k - 273.15f;
+    if (temp_c < -40.0f || temp_c > 125.0f) return NAN; // rango plausible
+    s_last_temp_c = temp_c;
+#if NTC_DEBUG_LOG
+    ESP_LOGI(TAG, "NTC raw=%.1f v=%.3f r_ntc=%.0f temp=%.2f", raw, v, r_ntc, temp_c);
+#endif
+    return temp_c;
 }
 
 static bool read_pir(void)
@@ -420,6 +431,14 @@ static void control_step(void)
     // Un ciclo de control: lee sensores, decide PWM, actualiza logs y OLED
     s_state.pir_active = read_pir();
     s_state.current_temp_c = read_temperature_c();
+    bool temp_valid = !isnan(s_state.current_temp_c);
+    float temp_use = s_state.current_temp_c;
+    if (!temp_valid && !isnan(s_last_temp_c)) {
+        temp_use = s_last_temp_c; // usa última válida
+    }
+    if (isnan(temp_use)) {
+        temp_use = 0.0f; // fallback
+    }
 
     float pwm = 0.0f;
 
@@ -429,7 +448,7 @@ static void control_step(void)
         if (!s_state.pir_active) {
             pwm = 0.0f;
         } else if (s_state.mode == FAN_MODE_AUTO) {
-            pwm = map_temp_to_pwm(s_state.current_temp_c, s_state.auto_t_min, s_state.auto_t_max);
+            pwm = map_temp_to_pwm(temp_use, s_state.auto_t_min, s_state.auto_t_max);
         } else if (s_state.mode == FAN_MODE_SCHEDULE) {
             time_t now = 0;
             struct tm timeinfo = {0};
@@ -443,7 +462,7 @@ static void control_step(void)
             } else {
                 for (int i = 0; i < 3; i++) {
                     if (is_schedule_active(&s_state.schedules[i], &timeinfo)) {
-                        pwm = map_temp_to_pwm(s_state.current_temp_c,
+                        pwm = map_temp_to_pwm(temp_use,
                                               s_state.schedules[i].temp_0,
                                               s_state.schedules[i].temp_100);
                         break;
@@ -451,6 +470,15 @@ static void control_step(void)
                 }
             }
         }
+    }
+
+    if (!temp_valid) {
+        if (!s_warned_nan_temp) {
+            ESP_LOGW(TAG, "NTC lectura invalida; usando temp fallback=%.2f C y PWM=%.1f", temp_use, pwm);
+            s_warned_nan_temp = true;
+        }
+    } else {
+        s_warned_nan_temp = false;
     }
 
     // Sesiones de log
