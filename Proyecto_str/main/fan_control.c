@@ -106,6 +106,7 @@ static const uint8_t font5x7[][5] = {
 
 static void fan_save_log_entry(time_t end_ts)
 {
+    // Guarda en buffer circular el resumen de una sesión de ventilador encendido
     if (!s_session_active) return;
     fan_run_log_t entry = {
         .start_ts = s_session_start,
@@ -200,6 +201,7 @@ static void fan_apply_pwm(float pwm_pct)
 
 static float read_temperature_c(void)
 {
+    // Lee varias muestras ADC del divisor NTC y convierte a °C con Beta
     if (!s_adc_unit) return NAN;
     int acc = 0;
     for (int i = 0; i < ADC_SAMPLES; i++) {
@@ -383,6 +385,7 @@ static void ssd1306_render_state(void)
 
 static bool is_schedule_active(const fan_schedule_entry_t *entry, const struct tm *now_tm)
 {
+    // Verifica si un registro aplica para la hora/día actual (considera cruce de medianoche)
     if (!entry->active || !now_tm) {
         return false;
     }
@@ -402,6 +405,7 @@ static bool is_schedule_active(const fan_schedule_entry_t *entry, const struct t
 
 static float map_temp_to_pwm(float temp_c, float t0, float t100)
 {
+    // Mapea temperatura a PWM entre dos umbrales linealmente
     if (t100 <= t0) {
         return (temp_c >= t0) ? 100.0f : 0.0f;
     }
@@ -413,6 +417,7 @@ static float map_temp_to_pwm(float temp_c, float t0, float t100)
 
 static void control_step(void)
 {
+    // Un ciclo de control: lee sensores, decide PWM, actualiza logs y OLED
     s_state.pir_active = read_pir();
     s_state.current_temp_c = read_temperature_c();
 

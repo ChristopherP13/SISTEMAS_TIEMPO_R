@@ -1,9 +1,4 @@
-/*
- * wifi_app.c
- *
- *  Created on: Oct 17, 2021
- *      Author: kjagu
- */
+// @brief Gestión WiFi/AP/STA, SNTP, cola de eventos y registros legacy.
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -47,6 +42,8 @@ bool time_was_synchronized;
 
 extern uint8_t s_led_state;
 
+// forward declaration
+static void wifi_app_connect_sta(void);
 
 
 
@@ -170,8 +167,6 @@ esp_err_t read_reg_data(char *str_to_save ,uint8_t register_num){
         return ESP_FAIL;
     }
 
-    // Tamaño de la cadena que se espera leer
-    size_t str_len = 0;
 	char reg_to_send[6];
 	const char *ptr_const_char = reg_to_send;
 	memset(&reg_to_send[0], 0x00, 6);

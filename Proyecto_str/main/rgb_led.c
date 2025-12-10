@@ -1,9 +1,4 @@
-/*
- * rgb_led.c
- *
- *  Created on: Oct 11, 2021
- *      Author: kjagu
- */
+// @brief Control de LED RGB para estados de aplicación (WiFi, HTTP server).
 
 #include <stdbool.h>
 

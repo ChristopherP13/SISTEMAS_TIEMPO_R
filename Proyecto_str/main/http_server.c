@@ -1,9 +1,4 @@
-/*
- * http_server.c
- *
- *  Created on: Oct 20, 2021
- *      Author: kjagu
- */
+// @brief Servidor HTTP: sirve la UI, maneja OTA, WiFi STA, control de ventilador y registros.
 
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -335,7 +330,6 @@ static esp_err_t http_server_read_register_handler(httpd_req_t *req)
 {
 	ESP_LOGI(TAG, "/readreg.json requested");
 
-	char read_regs[255];
 	char register_information_read_1[12];
 	register_information_read_1[11] = 0x00;
 	if (read_reg_data( &register_information_read_1[0], 1 ) != ESP_OK ){

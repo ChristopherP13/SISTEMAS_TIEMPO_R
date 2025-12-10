@@ -1,6 +1,5 @@
-/**
- * Application entry point.
- */
+// @brief Punto de entrada principal: inicializa NVS, SNTP, LED de prueba,
+//        arranca WiFi/HTTP y el controlador del ventilador.
 
 #include "nvs_flash.h"
 #include "wifi_app.h"

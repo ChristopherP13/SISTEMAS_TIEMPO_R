@@ -1,4 +1,4 @@
-# Nota de aplicación – Ventilador inteligente ESP32
+# Nota de aplicación — Ventilador inteligente ESP32
 
 ## Arquitectura y características
 - ESP32 DevKitC controlando ventilador DC por PWM (LEDC 20 kHz, 8 bits).
@@ -7,7 +7,46 @@
 - Persistencia en NVS: configuraciones y logs de ejecución.
 - SNTP para fecha/hora y para evaluar programación horaria.
 
-## Flujo web ↔ firmware
+## Estructuras clave (fan_control.h)
+```c
+typedef enum {
+    FAN_MODE_MANUAL = 0,   // PWM fijo, sin PIR/temperatura
+    FAN_MODE_AUTO,         // PIR requerido, PWM proporcional t_min–t_max
+    FAN_MODE_SCHEDULE      // PIR requerido, PWM según registros activos
+} fan_mode_t;
+
+typedef struct {
+    bool    active;        // Registro habilitado
+    uint8_t start_hour;    // 0-23
+    uint8_t start_minute;  // 0-59
+    uint8_t end_hour;      // 0-23
+    uint8_t end_minute;    // 0-59
+    uint8_t days_mask;     // bit0=Dom ... bit6=Sáb
+    float   temp_0;        // Temp → 0% PWM
+    float   temp_100;      // Temp → 100% PWM
+} fan_schedule_entry_t;
+
+typedef struct {
+    time_t start_ts;   // Epoch inicio de sesión
+    time_t end_ts;     // Epoch fin de sesión
+    float  temp_min;   // Temperatura mínima observada
+    float  temp_max;   // Temperatura máxima observada
+    float  max_pwm;    // PWM máximo aplicado (0-100 %)
+} fan_run_log_t;
+
+typedef struct {
+    fan_mode_t mode;                   // Modo actual
+    float manual_pwm;                  // PWM 0-100 % (manual)
+    float auto_t_min;                  // Umbral inferior auto
+    float auto_t_max;                  // Umbral superior auto
+    fan_schedule_entry_t schedules[3]; // Registros programados (hasta 3)
+    float current_temp_c;              // Lectura NTC en °C
+    bool  pir_active;                  // Estado PIR
+    float current_pwm;                 // PWM aplicado 0-100 %
+} fan_state_t;
+```
+
+## Flujo web → firmware
 `main/webpage/app.js` envía y recibe JSON:
 ```js
 // Modo
@@ -45,7 +84,7 @@ Se escribe en `fan_save_config()` y se restaura en `fan_load_config()` al arranc
 
 ## Lógica de control (control_step)
 - Lee PIR en GPIO33.
-- Lee NTC en ADC1_CH4 (GPIO32) con divisor NTC↔3.3 V, Rref 100 k↔GND:
+- Lee NTC en ADC1_CH4 (GPIO32) con divisor NTC→3.3 V, Rref 100 kΩ a GND:
 ```c
 float v = (raw / 4095.0f) * 3.3f;
 float r_ntc = Rref * ((Vref - v) / v);
@@ -71,7 +110,7 @@ temp_C = (1/inv_t) - 273.15f;
 ## Pines usados (ESP32 DevKitC)
 - GPIO19: PWM ventilador (LEDC HS Timer1 canal 3, 20 kHz).
 - GPIO33: PIR (HC-SR501, OUT 3.3 V), pull-down habilitado.
-- GPIO32: NTC (ADC1_CH4) divisor 100 k a GND, NTC a 3.3 V.
+- GPIO32: NTC (ADC1_CH4) divisor 100 kΩ a GND, NTC a 3.3 V.
 - GPIO21/22/23: LED RGB de estado (WiFi/app).
 
 ## Buenas prácticas y pruebas

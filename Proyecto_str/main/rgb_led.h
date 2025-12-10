@@ -1,9 +1,4 @@
-/*
- * rgb_led.h
- *
- *  Created on: Oct 11, 2021
- *      Author: kjagu
- */
+// @brief Definiciones y API para controlar el LED RGB de estado WiFi/HTTP.
 
 #ifndef MAIN_RGB_LED_H_
 #define MAIN_RGB_LED_H_
